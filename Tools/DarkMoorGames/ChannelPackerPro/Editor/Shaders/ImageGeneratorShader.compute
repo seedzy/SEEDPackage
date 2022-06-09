@@ -1,0 +1,239 @@
+﻿#pragma kernel GenerateImageCircle
+#pragma kernel GenerateImageLinearGradient
+#pragma kernel GenerateImageBiLinearGradient
+#pragma kernel GenerateImageNoise
+#pragma kernel GenerateImageBorder
+#pragma kernel GenerateImageCheckerBoard
+#pragma kernel GenerateImageSolidColor
+#pragma kernel GenerateImageVoronoiEuclidien
+#pragma kernel GenerateImageVoronoiManhattan
+#pragma kernel GenerateImageClouds
+
+#if !defined(PI)
+#define PI 3.14159265358979323846
+#endif
+
+int ImageWidth;
+int ImageHeight;
+
+float Value;
+int IntValue;
+bool Invert;
+float Threshold;
+float4 Color1;
+float4 Color2;
+
+float Scale;
+float Hardness;
+float OffsetX;
+float OffsetY;
+float Rotation;
+
+int Size;
+int Thickness;
+
+RWTexture2D<float4> Output;
+
+float N21(float2 n)
+{
+	return frac(sin(dot(n, float2(12.9898, 78.233))) * 43758.5453123);
+}
+float2 N22(float2 p)
+{
+	float3 a = frac(p.xyx * float3(123.34, 234.34, 345.65));
+	a += dot(a, a + 34.45);
+	return frac(float2(a.x * a.y, a.y * a.z));
+}
+
+float CloudNoise(float2 uv)
+{
+	float2 gridUv = smoothstep(0.0, 1.0, frac(uv));
+	float2 id = floor(uv);
+
+	float bl = N21(id);
+	float br = N21(id + float2(1.0, 0.0));
+	float b = lerp(bl, br, gridUv.x);
+
+	float tl = N21(id + float2(0.0, 1.0));
+	float tr = N21(id + float2(1.0, 1.0));
+	float t = lerp(tl, tr, gridUv.x);
+
+	return lerp(b, t, gridUv.y);
+}
+
+[numthreads(8, 8, 1)]
+void GenerateImageCircle(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight) - float2(OffsetX, OffsetY);
+
+	float2 grid = frac(uv * IntValue);
+	float dist = distance(float2(0.5, 0.5), grid.xy);
+
+	float a = smoothstep(0.5, 0.4999999 * Hardness, dist / Scale);
+	Output[id.xy] = float4(Color1.rgb, a);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageLinearGradient(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float s = sin(-Rotation * (PI / 180.0));
+	float c = cos(-Rotation * (PI / 180.0));
+
+	float2x2 mat = float2x2(c, -s, s, c);
+	float rot = (mul(uv.xy - 0.5, mat) + 0.5).x;
+	float final = smoothstep(Hardness - 0.5, (1.0 - Hardness) + 0.5001, rot);
+
+	float4 color = lerp(Color2, Color1, final);
+	Output[id.xy] = float4(color);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageBiLinearGradient(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float s = sin(-Rotation * (PI / 180.0));
+	float c = cos(-Rotation * (PI / 180.0));
+
+	float2x2 mat = float2x2(c, -s, s, c);
+	float rot = (mul(uv.xy - 0.5, mat) + 0.5).x;
+
+	float dist = 1.0 - distance(rot, 0.5);
+
+	float final = smoothstep(min(Hardness, 1), 1, dist);
+
+	float4 color = lerp(Color2, Color1, final);
+	Output[id.xy] = float4(color);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageNoise(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float noise = N21(uv);
+	Output[id.xy] = float4(noise, noise, noise, 1.0);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageBorder(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = float4(0.0, 0.0, 0.0, 0.0);
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+	
+	int2 pixel = int2(floor(uv.x * ImageWidth), floor(uv.y * ImageHeight));
+	int thickness = min(Thickness, max(ImageWidth, ImageHeight));
+
+	if (pixel.x < thickness || pixel.x >= (ImageWidth - thickness) || pixel.y < thickness || pixel.y >= (ImageHeight - thickness))
+	{
+		output = Color1;
+	}
+	else
+	{
+		output = Color2;
+	}
+	Output[id.xy] = output;
+}
+[numthreads(8, 8, 1)]
+void GenerateImageCheckerBoard(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = float4(0.0, 0.0, 0.0, 0.0);
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float f = floor(uv.x * IntValue) + floor(uv.y * IntValue);
+	int n = fmod(f, 2.0);
+	if (n == 1)
+	{
+		output = Color1;
+	}
+	else
+	{
+		output = Color2;
+	}
+	Output[id.xy] = output;
+}
+[numthreads(8, 8, 1)]
+void GenerateImageSolidColor(uint3 id : SV_DispatchThreadID)
+{
+	Output[id.xy] = Color1;
+}
+[numthreads(8, 8, 1)]
+void GenerateImageVoronoiEuclidien(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float2 uvOffset = (((uv - 0.5) * Scale) + float2(OffsetX, OffsetY));
+
+	float2 gridUv = frac(uvOffset);
+	float2 gridID = floor(uvOffset);
+	float minDist = 10000.0;
+
+	for (float y = -1.0; y <= 1.0; y++)
+	{
+		for (float x = -1.0; x <= 1.0; x++)
+		{
+			float2 offset = float2(x, y);
+
+			float2 n = N22(gridID + offset);
+			float2 p = offset + sin(n * 3.5) * 0.5;
+			float d = distance(gridUv, p);
+			if (d < minDist)
+			{
+				minDist = d;
+			}
+		}
+	}
+	Output[id.xy] = float4(minDist, minDist, minDist, 1.0);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageVoronoiManhattan(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	float2 uvOffset = (((uv - 0.5) * Scale) + float2(OffsetX, OffsetY));
+
+	float2 gridUv = frac(uvOffset);
+	float2 gridID = floor(uvOffset);
+	float minDist = 10000.0;
+
+	for (float y = -1.0; y <= 1.0; y++)
+	{
+		for (float x = -1.0; x <= 1.0; x++)
+		{
+			float2 offset = float2(x, y);
+
+			float2 n = N22(gridID + offset);
+			float2 p = offset + sin(n * 3.5) * 0.5;
+			p -= gridUv;
+			float d = abs(p.x) + abs(p.y);
+
+			if (d < minDist)
+			{
+				minDist = d;
+			}
+		}
+	}
+	Output[id.xy] = float4(minDist, minDist, minDist, 1.0);
+}
+[numthreads(8, 8, 1)]
+void GenerateImageClouds(uint3 id : SV_DispatchThreadID)
+{
+	float2 uv = float2((id.x + 0.5) / ImageWidth, (id.y + 0.5) / ImageHeight);
+
+	int octaves = IntValue;
+	float frequency = Scale * 2.0;
+	float f = 0.5;
+
+	float2 offset = (((uv - 0.5) * Scale) + float2(OffsetX, OffsetY));
+	float c = CloudNoise(offset);
+
+	for (int i = 0; i < octaves; i++)
+	{
+		c += CloudNoise(offset * frequency / Scale) * f;
+		frequency *= 2.0;
+		f /= 2.0;
+	}
+	if (octaves > 0)
+	{
+		c /= 2.0;
+	}
+	Output[id.xy] = float4(c, c, c, 1.0);
+}

@@ -1,0 +1,106 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSHizCullingVersionOne
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+StructuredBuffer<float4x4> allPosMatrixBuffer;
+RWStructuredBuffer<float4x4> visiblePosMatrixBuffer;
+RWStructuredBuffer<int> interLockBuffer;
+// float3 camPos;
+// float3 camDir;
+// float camHalfFov;
+float4x4 matrix_VP;
+Texture2D _HiZBufferRT;
+
+static float3 boundMin = float3(-0.6f, 0.0f, -0.6f);//包围盒最小点
+static float3 boundMax = float3(0.6f, 0.5f, 0.6f);  //包围盒最大点
+
+//在Clip Space下，根据齐次坐标做Clipping操作
+bool IsInClipSpace(float4 clipSpacePosition)
+{
+    //opgl和dxNDC不一样，要分开处理
+    // if (isOpenGL)
+    //     return clipSpacePosition.x > -clipSpacePosition.w && clipSpacePosition.x < clipSpacePosition.w&&
+    //     clipSpacePosition.y > -clipSpacePosition.w && clipSpacePosition.y < clipSpacePosition.w&&
+    //     clipSpacePosition.z > -clipSpacePosition.w && clipSpacePosition.z < clipSpacePosition.w;
+    // else
+    return clipSpacePosition.x > -clipSpacePosition.w && clipSpacePosition.x < clipSpacePosition.w&&
+    clipSpacePosition.y > -clipSpacePosition.w && clipSpacePosition.y < clipSpacePosition.w&&
+    clipSpacePosition.z > 0 && clipSpacePosition.z < clipSpacePosition.w;
+}
+
+[numthreads(16,16,1)]
+void CSHizCullingVersionOne (uint3 id : SV_DispatchThreadID)
+{
+    //这里总共有10 * 10个线程组，每个线程组有16 * 16个线程，那么总计有160 *160个线程，然后正好这里id是
+    //线程在10 * 10个线程组里的坐标(可以想象,10*10的线程组组合起来就是160*160这样一个大的二维线程数组，
+    //id.xy分别是行号和列号),详细看笔记
+    int index = 16 * 10 * id.x + id.y;
+    float4x4 currentObj2World = allPosMatrixBuffer[index];
+    float4x4 matrix_MVP = mul(matrix_VP, currentObj2World);
+
+    //包围盒的8个顶点的View Space坐标
+    float4 boundVerts[8];
+    boundVerts[0] = float4(boundMin, 1);
+    boundVerts[1] = float4(boundMax, 1);
+    boundVerts[2] = float4(boundMax.x, boundMax.y, boundMin.z, 1);
+    boundVerts[3] = float4(boundMax.x, boundMin.y, boundMax.z, 1);
+    boundVerts[4] = float4(boundMax.x, boundMin.y, boundMin.z, 1);
+    boundVerts[5] = float4(boundMin.x, boundMax.y, boundMax.z, 1);
+    boundVerts[6] = float4(boundMin.x, boundMax.y, boundMin.z, 1);
+    boundVerts[7] = float4(boundMin.x, boundMin.y, boundMax.z, 1);
+
+    bool allVertOutSideClipSpace = true;
+    //减少计算量
+    float4 positionCS[8];
+    for(int j = 0; j< 8; j++)
+    {
+        positionCS[j] = mul(matrix_MVP, boundVerts[j]);
+        if(allVertOutSideClipSpace && IsInClipSpace(positionCS[j]))
+            allVertOutSideClipSpace = false;
+    }
+    
+    if(allVertOutSideClipSpace)
+        return;
+
+    //ndc下包围盒变形不再轴对称，此处重建ndc下aabb包围盒
+    float3 positionNDC = positionCS[0].xyz / positionCS[0].w;
+    float3 ndcBoundMin = positionNDC;
+    float3 ndcBoundMax = positionNDC;
+    for(int i = 0; i< 7; i++)
+    {
+        float3 positionNDC = positionCS[i].xyz / positionCS[i].w;
+        ndcBoundMin.x = min(positionNDC.x, ndcBoundMin.x); 
+        ndcBoundMin.y = min(positionNDC.y, ndcBoundMin.y); 
+        //ndcBoundMin.z = min(positionNDC.z, ndcBoundMin.z); 
+        ndcBoundMax.x = max(positionNDC.x, ndcBoundMax.x); 
+        ndcBoundMax.y = max(positionNDC.y, ndcBoundMax.y); 
+        ndcBoundMax.z = max(positionNDC.z, ndcBoundMax.z); 
+    }
+
+    //ToDo:OpenGL记得转Z值
+    //ndc包围盒xy值转到屏幕空间下(没乘屏幕尺寸的屏幕空间)，这里现在pc下弄，所以z值没转
+    float2 ssBoundmMin = ndcBoundMin.xy * 0.5 + 0.5;
+    float2 ssBoundmMax = ndcBoundMax.xy * 0.5 + 0.5;
+
+    //0~7对应现在的mipmap层级， 1024是现在HizBuffer的大小
+    uint mips = ( uint)clamp(log2(max(ssBoundmMax.x - ssBoundmMin.x, ssBoundmMax.y - ssBoundmMin.y) * 1024),0,7);
+    //计算对应mipmap层级下纹素的缩放比(以第一级1024为的图的单个纹素为准，那么512的单个纹素大小就是原来的2倍(宽度，不是面积))
+    uint texelScale = 1 << mips;
+    //拿到该包围盒对应到mipmap上的纹素坐标(不是像素坐标也不是UV坐标，你自己算算看嘛)
+    uint2 coordinate = uint2(ssBoundmMin.xy * (1024 / texelScale));
+    //获得对应层级mipmap对应纹素的深度值
+    float minDepth =
+        min(
+            min(_HiZBufferRT.mips[mips][coordinate.xy + uint2(0, 0)].r, _HiZBufferRT.mips[mips][coordinate.xy + uint2(0, 1)].r), 
+            min(_HiZBufferRT.mips[mips][coordinate.xy + uint2(1, 0)].r, _HiZBufferRT.mips[mips][coordinate.xy + uint2(1, 1)].r)
+            );
+    //和包围盒最小深度比较，大于则舍弃该实例数据
+    if(minDepth > ndcBoundMax.z) return;
+
+    //说是说用来取代computeBuffer.Append,避免同时写入，但是吧这原理是什么还真没懂
+    int currentIndex;
+    InterlockedAdd(interLockBuffer[1], 1, currentIndex);
+    visiblePosMatrixBuffer[currentIndex] = currentObj2World;
+}

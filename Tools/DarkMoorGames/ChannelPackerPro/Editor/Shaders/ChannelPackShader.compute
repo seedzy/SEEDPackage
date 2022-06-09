@@ -1,0 +1,324 @@
+﻿#pragma kernel PackRedToRed
+#pragma kernel PackRedToGreen
+#pragma kernel PackRedToBlue
+#pragma kernel PackRedToAlpha
+
+#pragma kernel PackGreenToRed
+#pragma kernel PackGreenToGreen
+#pragma kernel PackGreenToBlue
+#pragma kernel PackGreenToAlpha
+
+#pragma kernel PackBlueToRed
+#pragma kernel PackBlueToGreen
+#pragma kernel PackBlueToBlue
+#pragma kernel PackBlueToAlpha
+
+#pragma kernel PackAlphaToRed
+#pragma kernel PackAlphaToGreen
+#pragma kernel PackAlphaToBlue
+#pragma kernel PackAlphaToAlpha
+
+#pragma kernel PackValueToRed
+#pragma kernel PackValueToGreen
+#pragma kernel PackValueToBlue
+#pragma kernel PackValueToAlpha
+
+float Value;
+bool Invert;
+
+Texture2D<float4> Input;
+Texture2D<float4> Original;
+RWTexture2D<float4> Output;
+
+[numthreads(8, 8, 1)]
+void PackRedToRed(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(1.0 - input.r, output.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(input.r, output.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackRedToGreen(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, 1.0 - input.r, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, input.r, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackRedToBlue(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, 1.0 - input.r, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, input.r, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackRedToAlpha(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, 1.0 - input.r);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, input.r);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackGreenToRed(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(1.0 - input.g, output.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(input.g, output.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackGreenToGreen(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, 1.0 - input.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, input.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackGreenToBlue(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, 1.0 - input.g, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, input.g, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackGreenToAlpha(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, 1.0 - input.g);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, input.g);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackBlueToRed(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(1.0 - input.b, output.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(input.b, output.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackBlueToGreen(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, 1.0 - input.b, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, input.b, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackBlueToBlue(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, 1.0 - input.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, input.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackBlueToAlpha(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, 1.0 - input.b);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, input.b);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackAlphaToRed(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(1.0 - input.a, output.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(input.a, output.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackAlphaToGreen(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, 1.0 - input.a, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, input.a, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackAlphaToBlue(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, 1.0 - input.a, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, input.a, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackAlphaToAlpha(uint3 id : SV_DispatchThreadID)
+{
+	float4 input = Input[id.xy];
+	float4 output = Original[id.xy];
+
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, 1.0 - input.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, input.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackValueToRed(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = Original[id.xy];
+	if (Invert)
+	{
+		Output[id.xy] = float4(1.0 - Value, output.g, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(Value, output.g, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackValueToGreen(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = Original[id.xy];
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, 1.0 - Value, output.b, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, Value, output.b, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackValueToBlue(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = Original[id.xy];
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, 1.0 - Value, output.a);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, Value, output.a);
+	}
+}
+[numthreads(8, 8, 1)]
+void PackValueToAlpha(uint3 id : SV_DispatchThreadID)
+{
+	float4 output = Original[id.xy];
+	if (Invert)
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, 1.0 - Value);
+	}
+	else
+	{
+		Output[id.xy] = float4(output.r, output.g, output.b, Value);
+	}
+}
