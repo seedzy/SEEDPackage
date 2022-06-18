@@ -35,4 +35,9 @@ half LinearStep(half minValue, half maxValue, half In)
     return saturate((In-minValue) / (maxValue - minValue));
 }
 
+half Pow2(half x)
+{
+    return x * x;
+}
+
 #endif
