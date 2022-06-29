@@ -2,10 +2,7 @@
 #define SEED_LIT_FORWARD_INCLUDED
 
 #include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/SEED_Lighting.hlsl"
-
-#ifdef _DEPTHBLEND
-#define REQUIRE_SCREENUV
-#endif
+#include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/DepthBlend.hlsl"
 
 struct a2v
 {
@@ -54,7 +51,7 @@ void InitInputData(v2f i, out InputData o, half3 normalTS)
 #endif
     o.viewDirectionWS         = normalize(i.viewDirWS);
     o.shadowCoord             = zero;
-    o.fogCoord                = zero.r;
+    o.fogCoord                = InitializeInputDataFog(float4(i.positionWS, 1.0), 0);
     o.vertexLighting          = zero.rgb;
     o.bakedGI                 = SampleSH(i.normalWS);//SAMPLE_GI(i.lightmapUV, i.vertexSH, i.normalWS);
     o.normalizedScreenSpaceUV = zero.rg;
@@ -100,8 +97,10 @@ half4 frag (v2f i) : COLOR
 #endif
 
 #ifdef _DEPTHBLEND
-    col = DepthBlend(col, i.screenUV);
+    col = DepthBlend(col, i.screenUV, _DepthBlendFade);
 #endif
+
+    col.rgb = MixFog(col.rgb, inputData.fogCoord);
     
     return col;
 }

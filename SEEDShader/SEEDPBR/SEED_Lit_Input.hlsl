@@ -14,10 +14,7 @@ TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
 TEXTURE2D(_Smoe);         SAMPLER(sampler_Smoe); 
 TEXTURE2D(_BumpMap);         SAMPLER(sampler_BumpMap);
 
-#ifdef _DEPTHBLEND
-TEXTURE2D(_TerrainColorBuffer); SAMPLER(sampler_TerrainColorBuffer);
-TEXTURE2D(_TerrainDepthBuffer); SAMPLER(sampler_TerrainDepthBuffer);
-#endif
+
 
 
 half3 SampleNormal(float2 uv, TEXTURE2D_PARAM(bumpMap, sampler_bumpMap), half scale = 1.0h)
@@ -33,17 +30,6 @@ half3 SampleNormal(float2 uv, TEXTURE2D_PARAM(bumpMap, sampler_bumpMap), half sc
     return half3(0.0h, 0.0h, 1.0h);
 #endif
 }
-
-half4 DepthBlend(half4 color, float4 screenPos)
-{
-    #ifdef _DEPTHBLEND
-    float depth = screenPos.w;
-    float4 terrainColorDepth = _TerrainColorBuffer.Sample(sampler_TerrainColorBuffer, screenPos.xy / screenPos.w);
-    color.rgb = lerp(terrainColorDepth.rgb, color.rgb, saturate((terrainColorDepth.a * _ProjectionParams.z - depth)/ _DepthBlendFade));
-    #endif
-    return color;
-}
-
 
 inline void InitLitSurfaceData(float2 uv, out SurfaceInput outSurfaceInput)
 {

@@ -84,6 +84,15 @@ public class DepthBlend : ScriptableRendererFeature
             // cmd.GetTemporaryRT(terrainDepthHandle.id, renderingData.cameraData.cameraTargetDescriptor);
             
             RenderTextureDescriptor colorDepthDescriptor = renderingData.cameraData.cameraTargetDescriptor;
+            if (!renderingData.cameraData.isSceneViewCamera)
+            {
+                //加这句是因为gameCamera的RT是RGB111110Float
+                colorDepthDescriptor.colorFormat = RenderTextureFormat.ARGBHalf;
+            }
+
+            colorDepthDescriptor.width /= 2;
+            colorDepthDescriptor.height /= 2;
+            //加这句是因为gameCamera的RT似乎没有a通道
             //colorDepthDescriptor.colorFormat = RenderTextureFormat.ARGB32;
             cmd.GetTemporaryRT(terrainColorHandle.id, colorDepthDescriptor);
             

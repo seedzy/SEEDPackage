@@ -50,6 +50,8 @@ Shader "SEEDzy/SEEDPBR/Lit"
 
             #pragma shader_feature_local _DEPTHBLEND
             #pragma shader_feature_local _WRITECOLORDEPTH
+            //Unity variant
+            #pragma multi_compile_fog
             
             #pragma vertex vert
             #pragma fragment frag
