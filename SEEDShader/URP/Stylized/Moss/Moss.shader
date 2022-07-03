@@ -14,6 +14,8 @@ Shader "SEEDzy/URP/Stylized/Moss"
         _WindDirectionWithSpeed("_WindDirectionWithSpeed", Vector) = (1,1,1,1)
         [Toggle(_DEPTHBLEND)]_DepthBlendOn("DepthBlendOn", float) = 0
         _DepthBlendFade("_DepthBlendFade", range(0,1)) = 0.4
+        
+        
     }
     SubShader
     {
@@ -35,7 +37,7 @@ Shader "SEEDzy/URP/Stylized/Moss"
 
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/SEED_Lighting.hlsl"
             #include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/DepthBlend.hlsl"
             #include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/common.hlsl"
             #include "Assets/SEEDPackage/SEEDShader/ShaderLibrary/BRDF.hlsl"
@@ -150,7 +152,24 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 half ao = lerp(1, hei * hei, _AO);
 
                 half3 diffuse = albedo * _BaseColor * ao;
+                
+                //////////PBRTest
+                SurfaceInput surfaceInput;
+                half4 mixData = half4(1,1,1,1);
+                
 
+                surfaceInput.albedo       = albedo;
+                surfaceInput.smoothness   = mixData.r * _Smoothness;
+                surfaceInput.metallic     = mixData.g * 0;
+                surfaceInput.occlusion    = ao;
+                surfaceInput.emissionMask = mixData.a * _Emission * _EmissionColor;
+                surfaceInput.normalTS     = SampleNormal(uv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+                surfaceInput.IOR          = 1;
+                
+                InputData inputData;
+                InitInputData(i, inputData, surfaceInput.normalTS);
+                /////////////////////////////
+                ///
                 half4 finCol = half4(diffuse, albedo.a);
 
             #ifdef _DEPTHBLEND
