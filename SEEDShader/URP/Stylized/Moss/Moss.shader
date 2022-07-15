@@ -15,6 +15,13 @@ Shader "SEEDzy/URP/Stylized/Moss"
         [Toggle(_DEPTHBLEND)]_DepthBlendOn("DepthBlendOn", float) = 0
         _DepthBlendFade("_DepthBlendFade", range(0,1)) = 0.4
         
+        _Smoothness("Smoothness", range(0, 1)) = 0.5
+        
+        _TransIntensity("TransIntensity", range(0,1)) = 1
+        _TransExponent("TransExponent", float) = 1
+        _NormalDistortion("NormalDistortion", range(0,1)) = 0.5
+        _Wetness("Wetness", range(0, 1)) = 1
+        
         
     }
     SubShader
@@ -28,6 +35,7 @@ Shader "SEEDzy/URP/Stylized/Moss"
             HLSLPROGRAM
             #pragma target 4.5
             #pragma shader_feature_local _DEPTHBLEND
+            #pragma multi_compile_fog
             
             #pragma vertex vert
             #pragma require geometry
@@ -45,14 +53,20 @@ Shader "SEEDzy/URP/Stylized/Moss"
             float4 _MainTex_ST;
             float4 _HeightMap_ST;
             float4 _WindNoise_ST;
-            half _LayerAmount;
-            half _LayerSpacing;
-            half _AO;
-            half _PerceptualRoughness;
+            float _LayerAmount;
+            float _LayerSpacing;
+            float _AO;
+            float _PerceptualRoughness;
             half4 _WindStrength;
             half4 _WindDirectionWithSpeed;
-            half3 _BaseColor;
-            half _DepthBlendFade;
+            float4 _BaseColor;
+            float _DepthBlendFade;
+            float _Smoothness;
+            float _Wetness;
+
+            float _TransIntensity;
+            float _TransExponent;
+            float _NormalDistortion;
 
             TEXTURE2D(_MainTex);        SAMPLER(sampler_MainTex);
             TEXTURE2D(_HeightMap);        SAMPLER(sampler_HeightMap);
@@ -106,14 +120,6 @@ Shader "SEEDzy/URP/Stylized/Moss"
             void geom(triangle v2g input[3],inout TriangleStream<g2f> triStream)
             {
                 g2f o;
-                // for(int i = 0;i < 3; i++)
-                // {
-                //     o.uv = input[i].uv;
-                //     o.positionCS = TransformObjectToHClip(input[i].positionOS.xyz);
-                //     o.layer = 0;
-                //     triStream.Append(o);
-                // }
-                // triStream.RestartStrip();
 
                 for(int i = 0;i< _LayerAmount; i++)
                 {
@@ -135,6 +141,12 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 }
             }
 
+            float SimpleTransmission(float3 normal, float3 viewDirWS, float3 lightDirWS,float normalDistortion, float transIntensity, float transExponent)
+            {
+                float3 fakeNormal = -lerp(normal, lightDirWS, normalDistortion);
+                return pow(saturate(dot(fakeNormal, viewDirWS)), transExponent) * transIntensity;
+            }
+
             half4 frag (g2f i) : COLOR
             {
                 //这里取反一下，世界空间uv流动和纹理空间不太一样。。。。
@@ -143,7 +155,7 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 half2 WindNoise = (_WindNoise.Sample(sampler_WindNoise, windUV).xy - lerp((half2)0.5, (half2)0, saturate(_WindStrength.xy))) * _WindStrength.zw * i.layerHei01;
 
                 // sample the texture
-                half4 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv.xy); 
+                float4 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv.xy); 
                 half hei = _HeightMap.Sample(sampler_HeightMap, i.uv.zw + WindNoise * 0.01 * _WindDirectionWithSpeed.xy);
                 //half hei = _HeightMap.Sample(sampler_HeightMap, i.uv.zw + half2(WindNoise.x, 0) * _WindStrength * 0.01);
                 clip(hei - i.layerHei01);
@@ -151,9 +163,19 @@ Shader "SEEDzy/URP/Stylized/Moss"
  
                 half ao = lerp(1, hei * hei, _AO);
 
-                half3 diffuse = albedo * _BaseColor * ao;
-                
-                //////////PBRTest
+                albedo *= _BaseColor;
+
+                //////////////Common
+                float3 normalWS = normalize(i.normalWS);
+                float3 viewDirWS = normalize(GetWorldSpaceViewDir(i.positionWS));
+                float3 H = normalize(light.direction + viewDirWS);
+                float HdotV = saturate(dot(H, viewDirWS));
+                float NdotH = saturate(dot(normalWS, H));
+                float NdotV = saturate(dot(normalWS, viewDirWS));
+                float NdotL = saturate(dot(normalWS, light.direction));
+                float roughness = PerceptualRoughnessToRoughness(1- _Smoothness);
+
+                ////////////PBRTest
                 SurfaceInput surfaceInput;
                 half4 mixData = half4(1,1,1,1);
                 
@@ -162,20 +184,75 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 surfaceInput.smoothness   = mixData.r * _Smoothness;
                 surfaceInput.metallic     = mixData.g * 0;
                 surfaceInput.occlusion    = ao;
-                surfaceInput.emissionMask = mixData.a * _Emission * _EmissionColor;
-                surfaceInput.normalTS     = SampleNormal(uv, TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+                surfaceInput.emissionMask = mixData.a;
+                surfaceInput.normalTS     = 0;
                 surfaceInput.IOR          = 1;
                 
                 InputData inputData;
-                InitInputData(i, inputData, surfaceInput.normalTS);
+                inputData.positionWS = i.positionWS;
+                inputData.normalWS = normalWS;
+                inputData.viewDirectionWS = normalize(GetWorldSpaceViewDir(i.positionWS));
+                inputData.shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 /////////////////////////////
-                ///
-                half4 finCol = half4(diffuse, albedo.a);
+
+
+                ////////////Specular brdf
+                float  D = D_GGXNoPI(NdotH, roughness);
+                //由于需要一种光从植被间穿过的感觉，因此这里并不需要正常G项中对于背光面的光线遮挡，同时要保留一项避免掠射角过爆，所以对G进行修改，
+                //只保留一项GGX
+                float  G = GeometrySchlickGGX(NdotV, roughness);
+                float3 F = FresnelTerm_UE(NdotV, F0);
+                float denominator = max(4 * NdotL * NdotV, REAL_MIN);
+                float specularRadiance = D * G / max(4 * NdotV, REAL_MIN);
+                //specularRadiance = D * F * G/ denominator;
+
+
+                
+                ////////Transmission
+                float trans = SimpleTransmission(normalWS, viewDirWS, light.direction, _NormalDistortion, _TransIntensity, _TransExponent);
+          
+                //////////////Direct light radiance
+                //这里的ao其实不是想表达是ao只是hei * hei(稀疏的地方透射越强)，因为已经算过了就直接ao了
+                float lightRadiance = saturate(NdotL + ao * trans);
+
+                /////////////diffuse Light
+                float3 diffuse = albedo;
+
+                /////////////specular Light
+                //完了完了，越来越随意了，这个是因为光线垂直时高光不好看
+                float customRadiance = (1 - NdotL);
+                float3 specular = lerp(albedo, specularRadiance.xxx + F, _Wetness * customRadiance);
+                
+
+                /////////////IndirectLight
+                float3 indirectLight = SampleSH(normalWS) * albedo;
+
+                /////////////AO,高光部分ao进一步加强
+                diffuse *= ao;
+                specular *= pow(ao, 4);
+                indirectLight *= ao;
+
+                //////////////test
+                //diffuse = lightRadiance * albedo + SampleSH(normalWS) * albedo;
+                diffuse = (diffuse + specular) * lightRadiance * light.color + indirectLight;
+                //diffuse = (F + specularRadiance) * lightRadiance * 0.5;
+                //diffuse = lightRadiance;
+                //diffuse = specularRadiance;
+                //diffuse = saturate(diffuse);
+
+                
+
 
             #ifdef _DEPTHBLEND
-                diffuse = DepthBlend(finCol, i.screenUV, _DepthBlendFade);
+                diffuse = DepthBlend(diffuse, i.screenUV, _DepthBlendFade);
             #endif
-                return half4(diffuse.rgb, albedo.a);
+
+                float4 color = float4(diffuse.rgb, albedo.a);
+
+                //Unity Fog
+                color.rgb = MixFog(color.rgb, InitializeInputDataFog(float4(i.positionWS, 1.0), 0));
+                
+                return color;
             }
             ENDHLSL
         }

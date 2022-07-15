@@ -43,28 +43,29 @@ half3 IndirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput br
     return diffuseTerm + specularTerm;
 }
 
-half3 DirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput brdfInput)
+half3 DirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput brdfInput, Light light)
 {
     half3 ks = FresnelTerm_UE(brdfInput.HdotV, brdfInput.f0);
     half3 kd = (1 - ks) * (1 - surfaceInput.metallic);
     
     half3 diffuseTerm  = kd * DisneyDiffuse(brdfInput.NdotV, brdfInput.NdotL, brdfInput.LdotV, brdfInput.perceptualRoughness) * surfaceInput.albedo.rgb;
     half3 spevularTerm = ks * DV_SmithJointGGX_HDRP(brdfInput.NdotH, brdfInput.NdotL, brdfInput.NdotV, brdfInput.roughness);
-    
-    return diffuseTerm + spevularTerm;
+
+    half irradiance = saturate(dot(inputData.normalWS, light.direction)) * light.distanceAttenuation * light.shadowAttenuation;
+
+    return (diffuseTerm + spevularTerm) * light.color * irradiance;
 }
 
 
 half4 DisneyDiffuseSpecularLutPBR(InputData inputData, SurfaceInput surfaceInput )
 {
-    Light light = GetMainLight();
+    Light light = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
 
     half3 lightDirectionWS = normalize(light.direction);
     BRDFInput brdfInput;
     InitBRDFInput(inputData, surfaceInput, lightDirectionWS, brdfInput);
 
-    half3 color = DirectLight(inputData, surfaceInput, brdfInput);
-    color *= light.color * saturate(dot(inputData.normalWS, lightDirectionWS));
+    half3 color = DirectLight(inputData, surfaceInput, brdfInput, light);
     //URP包括Builtin都没除pi，为了保持亮度，这里先加回去
     color *= PI;
     

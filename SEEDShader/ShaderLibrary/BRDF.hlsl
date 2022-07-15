@@ -2,6 +2,7 @@
 #define SEEDSDHADER_LIGHTING_BRDF
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/BSDF.hlsl"
 
 #define UNITY_INV_PI                0.31830988618f
 #define F0                          half3(0.04, 0.04, 0.04)
@@ -86,15 +87,13 @@ inline half4 Pow5 (half4 x)
 /// </summary>
 float DistributionGGX(half3 N, half3 H, float roughness)
 {
-    float a      = roughness*roughness;
-    float a2     = a*a;
+    float a2     = roughness * roughness;
     float NdotH  = max(dot(N, H), 0.0);
     float NdotH2 = NdotH*NdotH;
 
     float nom   = a2;
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
     denom = PI * denom * denom;
-
     return nom / denom;
 }
 
@@ -111,10 +110,8 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 /// <summary>
 /// G项
 /// </summary>
-float GeometrySmith(half3 N, half3 V, half3 L, float roughness)
+float GeometrySmith(float NdotV, float NdotL, float roughness)
 {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
     float ggx2  = GeometrySchlickGGX(NdotV, roughness);
     float ggx1  = GeometrySchlickGGX(NdotL, roughness);
 
@@ -168,7 +165,7 @@ inline half3 FresnelTerm_Schlick(float HdotV, half3 f0)
 /// <summary>
 /// UE加速版Fresnel
 /// </summary>
-inline half3 FresnelTerm_UE(float HdotV, half3 f0)
+inline float3 FresnelTerm_UE(float HdotV, float3 f0)
 {
     return f0 + (1 - f0) * pow(2, (-5.55473 * HdotV - 6.98316) * HdotV);
 }

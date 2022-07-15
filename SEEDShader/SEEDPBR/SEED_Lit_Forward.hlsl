@@ -50,7 +50,7 @@ void InitInputData(v2f i, out InputData o, half3 normalTS)
     o.normalWS                = normalize(i.normalWS);
 #endif
     o.viewDirectionWS         = normalize(i.viewDirWS);
-    o.shadowCoord             = zero;
+    o.shadowCoord             = TransformWorldToShadowCoord(i.positionWS);;
     o.fogCoord                = InitializeInputDataFog(float4(i.positionWS, 1.0), 0);
     o.vertexLighting          = zero.rgb;
     o.bakedGI                 = SampleSH(i.normalWS);//SAMPLE_GI(i.lightmapUV, i.vertexSH, i.normalWS);
@@ -97,7 +97,7 @@ half4 frag (v2f i) : COLOR
 #endif
 
 #ifdef _DEPTHBLEND
-    col = DepthBlend(col, i.screenUV, _DepthBlendFade);
+    col.rgb = DepthBlend(col.rgb, i.screenUV, _DepthBlendFade);
 #endif
 
     col.rgb = MixFog(col.rgb, inputData.fogCoord);
