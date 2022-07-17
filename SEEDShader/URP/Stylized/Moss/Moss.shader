@@ -35,7 +35,14 @@ Shader "SEEDzy/URP/Stylized/Moss"
             HLSLPROGRAM
             #pragma target 4.5
             #pragma shader_feature_local _DEPTHBLEND
+            //Unity Variant
             #pragma multi_compile_fog
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
             
             #pragma vertex vert
             #pragma require geometry
@@ -159,7 +166,7 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 half hei = _HeightMap.Sample(sampler_HeightMap, i.uv.zw + WindNoise * 0.01 * _WindDirectionWithSpeed.xy);
                 //half hei = _HeightMap.Sample(sampler_HeightMap, i.uv.zw + half2(WindNoise.x, 0) * _WindStrength * 0.01);
                 clip(hei - i.layerHei01);
-                Light light = GetMainLight();
+                Light light = GetMainLight(TransformWorldToShadowCoord(i.positionWS), i.positionWS, float4(0,0,0,0));
  
                 half ao = lerp(1, hei * hei, _AO);
 
@@ -212,8 +219,9 @@ Shader "SEEDzy/URP/Stylized/Moss"
                 float trans = SimpleTransmission(normalWS, viewDirWS, light.direction, _NormalDistortion, _TransIntensity, _TransExponent);
           
                 //////////////Direct light radiance
+                
                 //这里的ao其实不是想表达是ao只是hei * hei(稀疏的地方透射越强)，因为已经算过了就直接ao了
-                float lightRadiance = saturate(NdotL + ao * trans);
+                float lightRadiance = saturate(NdotL + ao * trans) * light.distanceAttenuation * light.shadowAttenuation;
 
                 /////////////diffuse Light
                 float3 diffuse = albedo;
