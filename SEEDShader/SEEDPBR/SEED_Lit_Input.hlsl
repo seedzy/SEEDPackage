@@ -33,7 +33,7 @@ half3 SampleNormal(float2 uv, TEXTURE2D_PARAM(bumpMap, sampler_bumpMap), half sc
 
 inline void InitLitSurfaceData(float2 uv, out SurfaceInput outSurfaceInput)
 {
-    half4 albedo  = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _Albedo;
+    half4 albedo  = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
     half4 mixData = half4(1,1,1,1);
     
 #ifdef _MIXMAP_ON

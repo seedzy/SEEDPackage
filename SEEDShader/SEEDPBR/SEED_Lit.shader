@@ -3,7 +3,7 @@ Shader "SEEDzy/SEEDPBR/Lit"
     Properties
     {
         _BaseMap  ("BaseMap", 2D) = "white" {}
-        _Albedo   ("BaseColor", COlor) = (1,1,1,1)
+        _BaseColor   ("BaseColor", Color) = (1,1,1,1)
         _BumpMap  ("Normal", 2D) = "Black"{}
         _BumpScale("BumpScale", range(-1, 1)) = 1
         _Smoe     ("SMOE", 2D) = "Black"{}
@@ -57,6 +57,12 @@ Shader "SEEDzy/SEEDPBR/Lit"
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            
+            #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DYNAMICLIGHTMAP_ON
             #pragma multi_compile_fog
             
             #pragma vertex vert
@@ -128,6 +134,38 @@ Shader "SEEDzy/SEEDPBR/Lit"
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            ENDHLSL
+        }
+        
+         // This pass it not used during regular rendering, only for lightmap baking.
+        //exactly，it used to bake diffuseMap albedo for lightmap
+        Pass
+        {
+            Name "Meta"
+            Tags{"LightMode" = "Meta"}
+
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            #pragma vertex UniversalVertexMeta
+            #pragma fragment UniversalFragmentMetaLit
+
+            #pragma shader_feature EDITOR_VISUALIZATION
+            #pragma shader_feature_local_fragment _SPECULAR_SETUP
+            #pragma shader_feature_local_fragment _EMISSION
+            #pragma shader_feature_local_fragment _METALLICSPECGLOSSMAP
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
+            #pragma shader_feature_local_fragment _ _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            #pragma shader_feature_local _ _DETAIL_MULX2 _DETAIL_SCALED
+
+            #pragma shader_feature_local_fragment _SPECGLOSSMAP
+
+            #include "SEED_Lit_Input.hlsl"
+            #include "SEED_Lit_MetaPass.hlsl"
+
             ENDHLSL
         }
             

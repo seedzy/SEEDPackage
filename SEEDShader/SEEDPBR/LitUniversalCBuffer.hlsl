@@ -3,7 +3,7 @@
 
 #define LIT_UNIVERSAL_CBUFFER \
     float4 _BaseMap_ST;\
-    half4 _Albedo;\
+    half4 _BaseColor;\
     half _Smoothness;\
     half _Metallic;\
     half _Occlusion;\
