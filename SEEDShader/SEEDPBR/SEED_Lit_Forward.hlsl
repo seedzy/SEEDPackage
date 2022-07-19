@@ -12,6 +12,8 @@ struct a2v
 #ifdef _NORMALMAP
     float4 tangent    : TANGENT;
 #endif
+    float2 staticLightmapUV   : TEXCOORD1;
+    float2 dynamicLightmapUV  : TEXCOORD2;
 };
 
 struct v2f
@@ -21,7 +23,7 @@ struct v2f
     float3 positionWS : TEXCOORD1;
     half3  normalWS   : TEXCOORD2;
     half3  viewDirWS  : TEXCOORD3;
-    DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 4);
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 4);
 #ifdef _NORMALMAP
     float4 tangentWS : TEXCOORD5;
 #endif
@@ -30,6 +32,9 @@ struct v2f
 #endif
 #ifdef _WRITECOLORDEPTH
     float depth       : TEXCOORD7;
+#endif
+#ifdef DYNAMICLIGHTMAP_ON
+    float2  dynamicLightmapUV : TEXCOORD9; // Dynamic lightmap UVs
 #endif
     
 };
@@ -53,9 +58,13 @@ void InitInputData(v2f i, out InputData o, half3 normalTS)
     o.shadowCoord             = TransformWorldToShadowCoord(i.positionWS);;
     o.fogCoord                = InitializeInputDataFog(float4(i.positionWS, 1.0), 0);
     o.vertexLighting          = zero.rgb;
-    o.bakedGI                 = SampleSH(i.normalWS);//SAMPLE_GI(i.lightmapUV, i.vertexSH, i.normalWS);
+    #if defined(DYNAMICLIGHTMAP_ON)
+    o.bakedGI = SAMPLE_GI(i.staticLightmapUV, i.dynamicLightmapUV, i.vertexSH, i.normalWS);
+    #else
+    o.bakedGI = SAMPLE_GI(i.staticLightmapUV, i.vertexSH, i.normalWS);
+    #endif
     o.normalizedScreenSpaceUV = zero.rg;
-    o.shadowMask              = zero;
+    o.shadowMask              = SAMPLE_SHADOWMASK(i.staticLightmapUV);;
     
 }
 
@@ -73,6 +82,10 @@ v2f vert (a2v i)
     o.viewDirWS  = GetWorldSpaceViewDir(o.positionWS);
     o.uv = TRANSFORM_TEX(i.texcoord, _BaseMap);
     OUTPUT_SH(o.normalWS.xyz, o.vertexSH);
+    OUTPUT_LIGHTMAP_UV(i.staticLightmapUV, unity_LightmapST, o.staticLightmapUV);
+#ifdef DYNAMICLIGHTMAP_ON
+    o.dynamicLightmapUV = i.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
+#endif
 #ifdef REQUIRE_SCREENUV
     o.screenUV = ComputeScreenPos(o.positionCS);
 #endif

@@ -27,7 +27,7 @@ inline void InitBRDFInput(InputData inputData, SurfaceInput surfaceInput, half3 
     brdfInput.HdotV     = saturate(dot(H, inputData.viewDirectionWS));                  //共使用：2 次
 }
 
-half3 IndirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput brdfInput)
+half3 IndirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput brdfInput, inout Light mainLight)
 {
     half3 ks = FresnelSchlickRoughness(brdfInput.HdotV, brdfInput.f0, brdfInput.roughness);
     half3 kd = (1 - ks) * (1 - surfaceInput.metallic);;
@@ -35,7 +35,9 @@ half3 IndirectLight(InputData inputData, SurfaceInput surfaceInput, BRDFInput br
     half3 reflectVector = reflect(-inputData.viewDirectionWS, inputData.normalWS);
     half2 envBRDF = BRDF_Specular_Lut(brdfInput.NdotV, brdfInput.roughness);
     
+    MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI);
     half3 iblDiffuse  = inputData.bakedGI;
+    
     half3 iblSpecular = GlossyEnvironmentReflection(reflectVector, brdfInput.perceptualRoughness, surfaceInput.occlusion);
 
     half3 diffuseTerm  = kd * iblDiffuse * surfaceInput.albedo.rgb * surfaceInput.occlusion;
@@ -69,7 +71,7 @@ half4 DisneyDiffuseSpecularLutPBR(InputData inputData, SurfaceInput surfaceInput
     //URP包括Builtin都没除pi，为了保持亮度，这里先加回去
     color *= PI;
     
-    color += IndirectLight(inputData, surfaceInput, brdfInput);
+    color += IndirectLight(inputData, surfaceInput, brdfInput, light);
 
     color += surfaceInput.emissionMask * surfaceInput.albedo.rgb;
 
